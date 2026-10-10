@@ -1,0 +1,25 @@
+{
+  "topik": "Performa Timnas Indonesia di Kualifikasi Piala Dunia",
+  "metode": "indoroberta",
+  "total_postingan": 284,
+  "distribusi": {
+    "positive": {
+      "jumlah": 64,
+      "persentase": 22.54
+    },
+    "neutral": {
+      "jumlah": 133,
+      "persentase": 46.83
+    },
+    "negative": {
+      "jumlah": 87,
+      "persentase": 30.63
+    }
+  },
+  "evaluasi_manual": {
+    "total_sampel": 20,
+    "jumlah_sesuai": 13,
+    "persen_kesesuaian": 65.0
+  },
+  "diperbarui": "2026-10-09 16:33:58"
+}
