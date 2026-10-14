@@ -1,11 +1,25 @@
 import streamlit as st
 import pandas as pd
 import os
+import sys
+import importlib.util
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Import modul buatan anggota kelompok
 from regresi import train_and_evaluate, plot_actual_vs_pred, predict_likes
+
+SENTIMEN_PATH = os.path.join(
+    os.path.dirname(__file__),
+    'Timnas_Indonesia',
+    'analisis-sentiment',
+    'sentimen.py',
+)
+sentimen_spec = importlib.util.spec_from_file_location('analisis_sentimen', SENTIMEN_PATH)
+sentimen_module = importlib.util.module_from_spec(sentimen_spec) if sentimen_spec else None
+if sentimen_spec and sentimen_spec.loader and sentimen_module:
+    sys.modules[sentimen_spec.name] = sentimen_module
+    sentimen_spec.loader.exec_module(sentimen_module)
 
 st.set_page_config(
     page_title="Dashboard Analisis Data X: Timnas Indonesia", 
@@ -84,66 +98,11 @@ elif choice == "Data":
 
 # 3. HALAMAN SENTIMEN (Lengkap dengan Word Cloud)
 elif choice == "Sentimen":
-    st.header("Analisis Sentimen & Distribusi Teks")
-    
-    # Mencari lokasi file evaluasi sentimen buatan Anggota 2
-    sentiment_path = 'evaluasi_sentimen.csv'
-    if not os.path.exists(sentiment_path) and os.path.exists('Timnas_Indonesia/analisis-sentiment/output/evaluasi_sentimen.csv'):
-        sentiment_path = 'Timnas_Indonesia/analisis-sentiment/output/evaluasi_sentimen.csv'
-        
-    if os.path.exists(sentiment_path):
-        df_sentimen = pd.read_csv(sentiment_path)
-        
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.subheader("📊 Grafik Distribusi Sentimen")
-            
-            # Cek nama kolom label sentimen (sentiment atau label_manual)
-            if 'sentiment' in df_sentimen.columns:
-                counts = df_sentimen['sentiment'].value_counts()
-                fig, ax = plt.subplots(figsize=(6, 4))
-                sns.barplot(x=counts.index, y=counts.values, palette='viridis', ax=ax)
-                ax.set_ylabel("Jumlah Tweet")
-                st.pyplot(fig)
-            elif 'label_manual' in df_sentimen.columns:
-                counts = df_sentimen['label_manual'].value_counts()
-                fig, ax = plt.subplots(figsize=(6, 4))
-                sns.barplot(x=counts.index, y=counts.values, palette='viridis', ax=ax)
-                ax.set_ylabel("Jumlah Tweet")
-                st.pyplot(fig)
-            else:
-                st.info("Kolom 'sentiment' atau 'label_manual' tidak ditemukan pada CSV.")
-                
-        with col2:
-            st.subheader("☁️ Word Cloud (Awan Kata)")
-            try:
-                from wordcloud import WordCloud
-                
-                # Mendeteksi nama kolom teks (teks, text, atau full_text)
-                text_col = None
-                for col in ['teks', 'text', 'full_text']:
-                    if col in df_sentimen.columns:
-                        text_col = col
-                        break
-                
-                if text_col:
-                    text_combined = " ".join(df_sentimen[text_col].dropna().astype(str))
-                    wc = WordCloud(width=600, height=400, background_color='black').generate(text_combined)
-                    fig_wc, ax_wc = plt.subplots(figsize=(6, 4))
-                    ax_wc.imshow(wc, interpolation='bilinear')
-                    ax_wc.axis('off')
-                    st.pyplot(fig_wc)
-                else:
-                    st.info("Kolom teks tidak ditemukan untuk Word Cloud.")
-            except Exception as e:
-                st.info("Visualisasi Word Cloud siap ditampilkan (jalankan 'pip install wordcloud' di terminal).")
-                
-        st.markdown("---")
-        st.subheader("📋 Tabel Evaluasi Label Manual (20 Sampel Data)")
-        st.dataframe(df_sentimen, use_container_width=True)
+    if sentimen_module:
+        output_path = os.path.join(os.path.dirname(SENTIMEN_PATH), 'output')
+        sentimen_module.halaman_sentimen(out_dir=output_path)
     else:
-        st.info("File 'evaluasi_sentimen.csv' dari Anggota 2 belum diunggah.")
+        st.error(f"Modul analisis sentimen tidak ditemukan: {SENTIMEN_PATH}")
 
 # 4. HALAMAN CLUSTERING (K-Means)
 
