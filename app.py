@@ -135,18 +135,25 @@ elif choice == "Clustering":
 elif choice == "Regresi":
     st.header("Regresi Linear: Estimasi Jumlah Likes")
     
+    # Memastikan dataset utama dan kolom wajib tersedia
     if df is not None and 'like_count' in df.columns and 'text' in df.columns:
+        # Melatih dan mengevaluasi model regresi dari regresi.py
         model, mae, r2, y_test, y_pred = train_and_evaluate(df)
         
+        # 1. Menampilkan Metrik Evaluasi Utama (Sesuai Syarat Rubrik)
         col1, col2 = st.columns(2)
         col1.metric("MAE (Mean Absolute Error)", f"{mae:.2f}")
         col2.metric("R² Score", f"{r2:.4f}")
         
         st.markdown("---")
+        
+        # 2. Grafik Perbandingan Likes
         st.subheader("📈 Grafik Perbandingan Likes Aktual vs Prediksi")
         st.pyplot(plot_actual_vs_pred(y_test, y_pred))
         
         st.markdown("---")
+        
+        # 3. Formulir Estimasi Likes Interaktif
         st.subheader("🧮 Formulir Interaktif Estimasi Likes")
         with st.form("prediction_form"):
             user_words = st.number_input("Input Jumlah Kata (Word Count):", min_value=1, value=12)
@@ -155,18 +162,25 @@ elif choice == "Regresi":
             
             if submit_button:
                 pred = predict_likes(model, user_words, user_hashtags)
-                st.success(f"Estimasi Jumlah Likes: **{max(0, pred):.1f}**")
+                
+                # Penanganan hasil estimasi negatif sesuai ketentuan tugas
                 if pred < 0:
-                    st.warning("Catatan: Hasil estimasi mentah bernilai negatif karena batas linieritas model.")
+                    st.warning(f"Hasil Estimasi Mentah: **{pred:.2f}** (Secara Fisik Dibulatkan ke **0 Likes**)")
+                    st.info("💡 **Penjelasan Estimasi Negatif:** Model regresi linear dapat menghasilkan nilai negatif secara matematis. Dalam konteks jumlah likes, nilai negatif ini tidak bermakna fisik dan menunjukkan keterbatasan garis linieritas model.")
+                else:
+                    st.success(f"Estimasi Jumlah Likes: **{pred:.1f} Likes**")
 
-        with st.expander("📌 Penjelasan Evaluasi & Keterbatasan Model Regresi"):
-            st.write("""
-            - **MAE:** Mengukur rata-rata selisih mutlak antara jumlah likes asli dengan hasil estimasi.
-            - **R² Score:** Menunjukkan seberapa besar variansi likes yang dapat dijelaskan oleh jumlah kata dan hashtag.
-            - **Keterbatasan:** Jumlah likes di platform sosial media lebih dominan dipengaruhi oleh faktor visual, algoritma jangkauan, dan popularitas akun.
-            """)
+        st.markdown("---")
+        
+        # 4. Interpretasi Resmi Hasil Model Regresi (Wajib Dipresentasikan)
+        st.subheader("📌 Interpretasi & Evaluasi Model Regresi")
+        st.markdown(f"""
+        * **Makna Nilai MAE ({mae:.2f}):** Secara rata-rata, prediksi model memiliki simpangan atau kesalahan sebesar **{mae:.2f} likes** dari jumlah likes aktual pada data uji.
+        * **Makna Nilai R² ({r2:.4f}):** Variabel `word_count` dan `hashtag_count` hanya mampu menjelaskan sekitar **{max(0, r2*100):.2f}%** dari variasi jumlah likes (sisanya dipengaruhi faktor luar).
+        * **Keterbatasan Model:** Jumlah likes di platform X (Twitter) tidak hanya bergantung pada panjang teks atau jumlah hashtag, melainkan lebih banyak dipengaruhi oleh **isi materi visual (foto/video), reputasi/jangkauan akun, waktu unggah (prime time), serta algoritma jangkauan platform**.
+        """)
     else:
-        st.error("Dataset 'dataset_timnas.csv' atau kolom 'like_count' belum siap untuk regresi.")
+        st.error("Dataset 'dataset_timnas.csv' atau kolom wajib ('text', 'like_count') belum siap untuk diolah pada modul regresi.")
 
 # 6. HALAMAN TEMUAN & KETERBATASAN
 
