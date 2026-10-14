@@ -2,6 +2,7 @@
 import json
 import os
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -98,11 +99,36 @@ def halaman_sentimen(out_dir='output'):
 
     # --- Grafik distribusi ---
     st.write('### Distribusi Sentimen')
-    gambar = os.path.join(out_dir, 'distribusi_sentimen.png')
-    if os.path.exists(gambar):
-        st.image(gambar)
-    else:
-        st.bar_chart(data['jumlah'].reindex(URUTAN))
+    df_grafik = ringkasan.copy()
+    df_grafik['sentimen_label'] = df_grafik['sentimen'].astype(str).str.capitalize()
+    df_grafik['label_teks'] = df_grafik['jumlah'].astype(str) + ' (' + df_grafik['persentase'].astype(str) + '%)'
+
+    color_scale = alt.Scale(
+        domain=['Positive', 'Neutral', 'Negative'],
+        range=['#2e9e5b', '#8a94a6', '#d64545']
+    )
+
+    bars = alt.Chart(df_grafik).mark_bar(stroke='black', strokeWidth=1, opacity=0.85).encode(
+        x=alt.X('sentimen_label:N', sort=['Positive', 'Neutral', 'Negative'], title='Kategori Sentimen', axis=alt.Axis(labelAngle=0)),
+        y=alt.Y('jumlah:Q', title='Jumlah Postingan (Tweets)', scale=alt.Scale(domain=[0, float(df_grafik['jumlah'].max()) * 1.25])),
+        color=alt.Color('sentimen_label:N', scale=color_scale, legend=None),
+        tooltip=[
+            alt.Tooltip('sentimen_label:N', title='Sentimen'),
+            alt.Tooltip('jumlah:Q', title='Jumlah'),
+            alt.Tooltip('persentase:Q', title='Persentase (%)')
+        ]
+    )
+
+    text = alt.Chart(df_grafik).mark_text(dy=-10, fontSize=11, fontWeight='bold').encode(
+        x=alt.X('sentimen_label:N', sort=['Positive', 'Neutral', 'Negative']),
+        y=alt.Y('jumlah:Q'),
+        text='label_teks:N'
+    )
+
+    chart = (bars + text).properties(
+        title=alt.TitleParams(f'Distribusi Sentimen Publik Terhadap Timnas Indonesia (N={len(hasil)})', fontSize=14, anchor='middle')
+    )
+    st.altair_chart(chart, use_container_width=True)
 
     # --- Tren harian (jika ada kolom tanggal) ---
     if 'tanggal' in hasil.columns and hasil['tanggal'].notna().any():
@@ -144,6 +170,12 @@ def halaman_sentimen(out_dir='output'):
 
         if os.path.exists(f_tabel):
             tabel = _baca_csv(f_tabel)
+            if {'id_post', 'prediksi'}.issubset(tabel.columns) and {'id_post', 'sentiment'}.issubset(hasil.columns):
+                prediksi_dari_hasil = hasil.set_index('id_post')['sentiment']
+                tabel['prediksi'] = tabel['prediksi'].fillna('').astype(object)
+                prediksi_kosong = tabel['prediksi'].astype(str).str.strip().eq('')
+                tabel.loc[prediksi_kosong, 'prediksi'] = tabel.loc[prediksi_kosong, 'id_post'].map(prediksi_dari_hasil)
+
             kolom_sampel = [c for c in ['teks', 'label_manual', 'prediksi'] if c in tabel.columns]
             st.write('**Semua sampel**')
             st.dataframe(tabel[kolom_sampel], hide_index=True)
