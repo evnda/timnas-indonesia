@@ -8,6 +8,7 @@ import seaborn as sns
 
 # Import modul buatan anggota kelompok
 from regresi import train_and_evaluate, plot_actual_vs_pred, predict_likes
+from wordcloud import WordCloud
 
 SENTIMEN_PATH = os.path.join(
     os.path.dirname(__file__),
@@ -108,27 +109,155 @@ elif choice == "Sentimen":
 
 elif choice == "Clustering":
     st.header("Pengelompokan Pembahasan Teks (K-Means Clustering)")
-    
-    cluster_path = 'hasil_cluster.csv'
-    if not os.path.exists(cluster_path) and os.path.exists('Timnas_Indonesia/hasil_cluster.csv'):
-        cluster_path = 'Timnas_Indonesia/hasil_cluster.csv'
-        
+
+    # Membaca file hasil clustering
+    cluster_path = "hasil_cluster.csv"
+    if not os.path.exists(cluster_path) and os.path.exists(
+        "Timnas_Indonesia/hasil_cluster.csv"
+    ):
+        cluster_path = "Timnas_Indonesia/hasil_cluster.csv"
+
     if os.path.exists(cluster_path):
         df_cluster = pd.read_csv(cluster_path)
-        
-        if 'cluster' in df_cluster.columns:
-            st.subheader("📊 Distribusi Jumlah Data per Cluster Topik")
-            cluster_counts = df_cluster['cluster'].value_counts()
-            fig, ax = plt.subplots(figsize=(7, 3.5))
-            sns.barplot(x=cluster_counts.index, y=cluster_counts.values, palette='magma', ax=ax)
-            ax.set_xlabel("ID Cluster Topik")
-            ax.set_ylabel("Jumlah Postingan")
-            st.pyplot(fig)
-            
-        st.subheader("📑 Tabel Hasil Clustering")
-        st.dataframe(df_cluster, use_container_width=True)
+
+        if "cluster" not in df_cluster.columns:
+            st.error(
+                "Kolom 'cluster' tidak ditemukan dalam file 'hasil_cluster.csv'."
+            )
+        else:
+            # Pastikan label cluster berupa angka murni
+            df_cluster["cluster"] = pd.to_numeric(
+                df_cluster["cluster"], errors="coerce"
+            )
+            df_cluster = df_cluster.dropna(subset=["cluster"]).copy()
+            df_cluster["cluster"] = df_cluster["cluster"].astype(int)
+
+            if df_cluster.empty:
+                st.warning("Tidak ada data cluster yang valid.")
+            else:
+                # 1. Grafik Distribusi Cluster
+                st.subheader("📊 Distribusi Jumlah Data per Cluster")
+                cluster_counts = (
+                    df_cluster["cluster"].value_counts().sort_index()
+                )
+
+                fig, ax = plt.subplots(figsize=(7, 3.5))
+                sns.barplot(
+                    x=cluster_counts.index.astype(str),
+                    y=cluster_counts.values,
+                    color="#d95f8d",
+                    ax=ax,
+                )
+                ax.set_xlabel("ID Cluster")
+                ax.set_ylabel("Jumlah Postingan")
+                ax.set_title("Distribusi Postingan per Cluster")
+                st.pyplot(fig)
+                plt.close(fig)
+
+                # 2. Interaktif WordCloud per Cluster
+                st.divider()
+                st.subheader("☁️ Word Cloud per Cluster")
+
+                daftar_cluster = sorted(df_cluster["cluster"].unique().tolist())
+                cluster_terpilih = st.selectbox(
+                    "Pilih cluster yang ingin ditampilkan:",
+                    options=daftar_cluster,
+                    format_func=lambda x: f"Cluster {x + 1}",
+                )
+
+                df_pilihan = df_cluster[
+                    df_cluster["cluster"] == cluster_terpilih
+                ].copy()
+                st.write(
+                    f"Jumlah postingan pada Cluster {cluster_terpilih + 1}: "
+                    f"**{len(df_pilihan)} postingan**"
+                )
+
+                # Menentukan kolom teks
+                if "text" in df_pilihan.columns:
+                    kolom_teks = "text"
+                elif "text_raw" in df_pilihan.columns:
+                    kolom_teks = "text_raw"
+                else:
+                    kolom_teks = None
+
+                if kolom_teks is None:
+                    st.warning(
+                        "Kolom 'text' atau 'text_raw' tidak ditemukan dalam hasil clustering."
+                    )
+                else:
+                    teks_cluster = (
+                        df_pilihan[kolom_teks]
+                        .dropna()
+                        .astype(str)
+                        .str.strip()
+                    )
+                    teks_cluster = teks_cluster[teks_cluster != ""]
+                    teks_gabungan = " ".join(teks_cluster.tolist())
+
+                    if not teks_gabungan:
+                        st.warning(
+                            "Tidak ada teks yang dapat digunakan untuk membuat Word Cloud."
+                        )
+                    else:
+                        stopwords_indonesia = {
+                            "yang", "dan", "di", "ke", "dari", "ini", "itu", "untuk",
+                            "dengan", "pada", "dalam", "karena", "jadi", "akan", "ada",
+                            "atau", "juga", "sudah", "belum", "masih", "saat", "saja",
+                            "lebih", "bisa", "aku", "saya", "kamu", "dia", "mereka",
+                            "kita", "kami", "nya", "lah", "kan", "nih", "sih", "aja",
+                            "yg", "dgn", "buat", "kalau", "kalo", "tapi", "namun",
+                            "the", "and", "is", "are", "of", "to", "in", "on", "for",
+                            "with", "at", "by", "from",
+                        }
+
+                        try:
+                            wordcloud = WordCloud(
+                                width=1200,
+                                height=600,
+                                background_color="white",
+                                stopwords=stopwords_indonesia,
+                                max_words=100,
+                                collocations=False,
+                                random_state=42,
+                            ).generate(teks_gabungan)
+
+                            fig_wc, ax_wc = plt.subplots(figsize=(12, 6))
+                            ax_wc.imshow(
+                                wordcloud, interpolation="bilinear"
+                            )
+                            ax_wc.axis("off")
+                            ax_wc.set_title(
+                                f"Word Cloud Cluster {cluster_terpilih + 1}"
+                            )
+
+                            st.pyplot(fig_wc)
+                            plt.close(fig_wc)
+
+                        except ValueError:
+                            st.warning(
+                                "Word Cloud tidak dapat dibuat. Periksa apakah teks cluster mengandung kata yang dapat diproses."
+                            )
+
+                # 3. Kata Dominan Cluster
+                st.divider()
+                st.subheader("🔤 Kata Dominan Cluster")
+                if "kata_dominan" in df_cluster.columns:
+                    kata_cluster = (
+                        df_pilihan["kata_dominan"].dropna().astype(str)
+                    )
+                    if not kata_cluster.empty:
+                        st.write(kata_cluster.iloc[0])
+
+                # 4. Tabel Hasil Clustering
+                st.divider()
+                st.subheader("📑 Tabel Hasil Clustering")
+                st.dataframe(df_cluster, use_container_width=True)
+
     else:
-        st.info("File 'hasil_cluster.csv' dari Anggota 3 belum diunggah.")
+        st.info(
+            "File 'hasil_cluster.csv' dari Anggota 3 belum ditemukan. Periksa lokasi file tersebut."
+        )
 
 # 5. HALAMAN REGRESI (Bagian Anggota 4)
 
@@ -140,7 +269,7 @@ elif choice == "Regresi":
         # Melatih dan mengevaluasi model regresi dari regresi.py
         model, mae, r2, y_test, y_pred = train_and_evaluate(df)
         
-        # 1. Menampilkan Metrik Evaluasi Utama (Sesuai Syarat Rubrik)
+        # 1. Menampilkan Metrik Evaluasi Utama
         col1, col2 = st.columns(2)
         col1.metric("MAE (Mean Absolute Error)", f"{mae:.2f}")
         col2.metric("R² Score", f"{r2:.4f}")
@@ -189,9 +318,9 @@ elif choice == "Temuan & Keterbatasan":
     
     st.subheader("💡 3 Temuan Utama Analisis Data:")
     st.markdown("""
-    1. **Dominasi Sentimen:** Perbincangan masyarakat di X mengenai Timnas Indonesia didominasi oleh respons positif dan antusiasme dukungan.
+    1. **Dominasi Sentimen:** Perbincangan masyarakat di X mengenai Timnas Indonesia didominasi oleh respons netral.
     2. **Pengelompokan Topik:** Diskusi publik terpolarisasi ke dalam beberapa topik utama (seperti performa pemain, taktik pelatih, dan jadwal pertandingan).
-    3. **Pengaruh Karakter Teks:** Jumlah kata dan hashtag memiliki korelasi yang sangat kecil terhadap jumlah likes pada postingan.
+    3. **Pengaruh Karakter Teks:** Jumlah kata dan hashtag tidak memiliki korelasi terhadap jumlah likes pada postingan.
     """)
     
     st.subheader("⚠️ 2 Keterbatasan Analisis / Metode:")
