@@ -7,7 +7,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Import modul buatan anggota kelompok
-from regresi import train_and_evaluate, plot_actual_vs_pred, predict_likes
+from regresi import (
+    train_and_evaluate,
+    plot_actual_vs_pred,
+    plot_heatmap,
+    plot_engagement,
+    plot_linearitas,
+    predict_likes,
+)
 from wordcloud import WordCloud
 
 SENTIMEN_PATH = os.path.join(
@@ -263,50 +270,91 @@ elif choice == "Clustering":
 
 elif choice == "Regresi":
     st.header("Regresi Linear: Estimasi Jumlah Likes")
-    
+
     # Memastikan dataset utama dan kolom wajib tersedia
     if df is not None and 'like_count' in df.columns and 'text' in df.columns:
         # Melatih dan mengevaluasi model regresi dari regresi.py
         model, mae, r2, y_test, y_pred = train_and_evaluate(df)
-        
+
+        st.info(
+            "Likes sangat miring ke kanan (banyak 0, sedikit sangat viral). "
+            "Agar hubungan bersifat linear, target ditransformasi menjadi "
+            "**log(1 + likes)** sebelum model dilatih."
+        )
+
         # 1. Menampilkan Metrik Evaluasi Utama
         col1, col2 = st.columns(2)
-        col1.metric("MAE (Mean Absolute Error)", f"{mae:.2f}")
-        col2.metric("R² Score", f"{r2:.4f}")
-        
+        col1.metric("MAE (skala likes asli)", f"{mae:.2f}")
+        col2.metric("R² Score (skala log)", f"{r2:.4f}")
+
         st.markdown("---")
-        
-        # 2. Grafik Perbandingan Likes
+
+        # 2. Heatmap Korelasi
+        st.subheader("🔥 Heatmap Korelasi Variabel")
+        fig_hm = plot_heatmap(df)
+        st.pyplot(fig_hm)
+        plt.close(fig_hm)
+
+        st.caption(
+            "Retweet dan reply hanya ditampilkan di heatmap sebagai pembanding. "
+            "Model prediksi tetap memakai word_count dan hashtag_count."
+        )
+
+        st.markdown("---")
+
+        # 3. Bukti Linearitas (sebelum vs sesudah log)
+        st.subheader("📉 Linearitas: Sebelum vs Sesudah Transformasi Log")
+        fig_lin = plot_linearitas(df)
+        st.pyplot(fig_lin)
+        plt.close(fig_lin)
+
+        st.markdown("---")
+
+        # 4. Grafik Perbandingan Likes
         st.subheader("📈 Grafik Perbandingan Likes Aktual vs Prediksi")
-        st.pyplot(plot_actual_vs_pred(y_test, y_pred))
-        
+        fig_pred = plot_actual_vs_pred(y_test, y_pred)
+        st.pyplot(fig_pred)
+        plt.close(fig_pred)
+
         st.markdown("---")
-        
-        # 3. Formulir Estimasi Likes Interaktif
+
+        # 4b. Analisis tambahan: antar-engagement (bukan prediksi)
+        fig_eng = plot_engagement(df)
+        if fig_eng is not None:
+            st.subheader("🔗 Analisis Tambahan: Retweet vs Likes")
+            st.pyplot(fig_eng)
+            plt.close(fig_eng)
+            st.caption(
+                "Ini korelasi antar-ukuran engagement, bukan model prediksi. "
+                "Retweet baru diketahui setelah postingan beredar, sehingga tidak "
+                "bisa dipakai untuk memperkirakan likes sebelum diunggah."
+            )
+            st.markdown("---")
+
+        # 5. Formulir Estimasi Likes Interaktif
         st.subheader("🧮 Formulir Interaktif Estimasi Likes")
         with st.form("prediction_form"):
             user_words = st.number_input("Input Jumlah Kata (Word Count):", min_value=1, value=12)
             user_hashtags = st.number_input("Input Jumlah Hashtag:", min_value=0, value=2)
             submit_button = st.form_submit_button("Hitung Estimasi Likes")
-            
+
             if submit_button:
                 pred = predict_likes(model, user_words, user_hashtags)
-                
-                # Penanganan hasil estimasi negatif sesuai ketentuan tugas
-                if pred < 0:
-                    st.warning(f"Hasil Estimasi Mentah: **{pred:.2f}** (Secara Fisik Dibulatkan ke **0 Likes**)")
-                    st.info("💡 **Penjelasan Estimasi Negatif:** Model regresi linear dapat menghasilkan nilai negatif secara matematis. Dalam konteks jumlah likes, nilai negatif ini tidak bermakna fisik dan menunjukkan keterbatasan garis linieritas model.")
-                else:
-                    st.success(f"Estimasi Jumlah Likes: **{pred:.1f} Likes**")
+                st.success(f"Estimasi Jumlah Likes: **{pred:.1f} Likes**")
+                st.caption(
+                    "Prediksi dihitung dari model log lalu dikembalikan ke skala "
+                    "likes, sehingga tidak pernah bernilai negatif."
+                )
 
         st.markdown("---")
-        
-        # 4. Interpretasi Resmi Hasil Model Regresi (Wajib Dipresentasikan)
+
+        # 6. Interpretasi Resmi Hasil Model Regresi (Wajib Dipresentasikan)
         st.subheader("📌 Interpretasi & Evaluasi Model Regresi")
         st.markdown(f"""
-        * **Makna Nilai MAE ({mae:.2f}):** Secara rata-rata, prediksi model memiliki simpangan atau kesalahan sebesar **{mae:.2f} likes** dari jumlah likes aktual pada data uji.
-        * **Makna Nilai R² ({r2:.4f}):** Variabel `word_count` dan `hashtag_count` hanya mampu menjelaskan sekitar **{max(0, r2*100):.2f}%** dari variasi jumlah likes (sisanya dipengaruhi faktor luar).
-        * **Keterbatasan Model:** Jumlah likes di platform X (Twitter) tidak hanya bergantung pada panjang teks atau jumlah hashtag, melainkan lebih banyak dipengaruhi oleh **isi materi visual (foto/video), reputasi/jangkauan akun, waktu unggah (prime time), serta algoritma jangkauan platform**.
+        * **Makna Nilai MAE ({mae:.2f}):** Secara rata-rata, prediksi model memiliki simpangan sebesar **{mae:.2f} likes** dari jumlah likes aktual pada data uji.
+        * **Makna Nilai R² ({r2:.4f}):** Variabel `word_count` dan `hashtag_count` hanya mampu menjelaskan sekitar **{max(0, r2*100):.2f}%** dari variasi log(1 + likes). Nilai mendekati 0 atau negatif berarti kedua variabel hampir tidak punya daya prediksi.
+        * **Baca Heatmap:** Korelasi `word_count` dan `hashtag_count` terhadap likes sangat kecil (mendekati 0), sehingga hubungan linearnya lemah.
+        * **Keterbatasan Model:** Jumlah likes di platform X tidak hanya bergantung pada panjang teks atau jumlah hashtag, melainkan lebih banyak dipengaruhi oleh **isi materi visual (foto/video), reputasi/jangkauan akun, waktu unggah (prime time), serta algoritma jangkauan platform**.
         """)
     else:
         st.error("Dataset 'dataset_timnas.csv' atau kolom wajib ('text', 'like_count') belum siap untuk diolah pada modul regresi.")
