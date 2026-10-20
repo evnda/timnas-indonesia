@@ -9,7 +9,7 @@ Proyek ini dibangun untuk menjawab 4 pertanyaan utama sesuai petunjuk praktikum:
 1. Bagaimana distribusi sentimen pada postingan yang dikumpulkan?
 2. Kelompok pembahasan (cluster) apa saja yang muncul?
 3. Apa ciri utama dari setiap cluster?
-4. Seberapa baik jumlah kata (`word_count`) dan hashtag (`hashtag_count`) dapat digunakan untuk memperkirakan jumlah likes (`like_count`)?
+4. Seberapa baik jumlah kata (`word_count`) dan hashtag (`hashtag_count`) dapat digunakan untuk memperkirakan jumlah likes (`like_count`)? Model memakai target `log(1 + like_count)` karena distribusi likes sangat miring ke kanan.
 
 ---
 
